@@ -1,0 +1,110 @@
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.o
+*.a
+
+# Go workspace and modules
+go.work
+go.work.sum
+vendor/
+
+# Build and output directories
+bin/
+dist/
+build/
+_build/
+release/
+
+# Test and coverage
+coverage.txt
+coverage.html
+profile.out
+*.cover
+*.prof
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Debugging
+__debug_bin
+debug
+debug.test
+*.pprof
+*.trace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Project specific
+*.m3u
+*.m3u8
+*.ts
+*.mp4
+*.mkv
+*.avi
+stream_cache/
+epg_cache/
+
+# Configuration and secrets
+.env
+*.env
+.env.*
+config.local.yaml
+config.local.yml
+local.yaml
+local.yml
+*.pem
+*.key
+*.crt
+*.cert
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+logs/
+tmp/
+temp/
+
+# Documentation generated files
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+*.pdf
+*.docx
+
+# Dependencies
+node_modules/
+jspm_packages/
+bower_components/
+
+# Backup files
+*.bak
+*.backup
+*~
+*.old
+*.orig
+*.rej
