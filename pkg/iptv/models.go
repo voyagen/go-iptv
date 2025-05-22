@@ -13,6 +13,12 @@ type Stream struct {
 	Container    string `json:"container,omitempty"`
 	CustomSID    string `json:"custom_sid,omitempty"`
 	DirectSource string `json:"direct_source,omitempty"`
+
+	// M3U specific fields
+	TVGID      string `json:"tvg_id,omitempty"`
+	TVGName    string `json:"tvg_name,omitempty"`
+	TVGLogo    string `json:"tvg_logo,omitempty"`
+	GroupTitle string `json:"group_title,omitempty"`
 }
 
 // Category represents a content category

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
+	"strings"
 )
 
 type streamService struct {
@@ -30,7 +33,11 @@ func (s *streamService) GetLive(ctx context.Context, opts ...RequestOption) ([]S
 
 	var streams []Stream
 	err := s.client.Get(ctx, params, &streams)
-	return streams, err
+	if err != nil {
+		return nil, err
+	}
+
+	return s.filterAndSort(streams, options)
 }
 
 func (s *streamService) GetVOD(ctx context.Context, opts ...RequestOption) ([]Stream, error) {
@@ -48,7 +55,125 @@ func (s *streamService) GetVOD(ctx context.Context, opts ...RequestOption) ([]St
 
 	var streams []Stream
 	err := s.client.Get(ctx, params, &streams)
-	return streams, err
+	if err != nil {
+		return nil, err
+	}
+
+	return s.filterAndSort(streams, options)
+}
+
+func (s *streamService) filterAndSort(streams []Stream, options *RequestOptions) ([]Stream, error) {
+	result := streams
+
+	// Apply filtering if specified
+	if options.Filter != "" {
+		filterRegex, err := regexp.Compile(options.Filter)
+		if err != nil {
+			return nil, fmt.Errorf("invalid filter regex: %w", err)
+		}
+
+		filtered := make([]Stream, 0)
+		for _, stream := range result {
+			if options.FilterRaw {
+				// Filter against the entire stream data
+				streamStr := fmt.Sprintf("%d|%s|%s|%s|%s|%s|%s|%s|%s",
+					stream.ID, stream.Name, stream.Type, stream.StreamType,
+					stream.CategoryID, stream.AVCLevel, stream.Container,
+					stream.CustomSID, stream.DirectSource)
+				if filterRegex.MatchString(streamStr) {
+					filtered = append(filtered, stream)
+				}
+			} else {
+				// Filter against a specific key
+				var valueToMatch string
+
+				switch strings.ToLower(options.FilterKey) {
+				case "stream_id", "id":
+					valueToMatch = fmt.Sprintf("%d", stream.ID)
+				case "name":
+					valueToMatch = stream.Name
+				case "stream_type", "type":
+					valueToMatch = stream.Type
+				case "category_id":
+					valueToMatch = stream.CategoryID
+				case "container":
+					valueToMatch = stream.Container
+				// M3U specific attributes
+				case "group-title":
+					// Maps to M3U group-title attribute
+					valueToMatch = stream.GroupTitle
+					if valueToMatch == "" {
+						valueToMatch = stream.Name // Fallback if not available
+					}
+				case "tvg-id":
+					valueToMatch = stream.TVGID
+				case "tvg-name":
+					valueToMatch = stream.TVGName
+					if valueToMatch == "" {
+						valueToMatch = stream.Name // Fallback if not available
+					}
+				case "tvg-logo":
+					valueToMatch = stream.TVGLogo
+				default:
+					// Default to name if key not recognized
+					valueToMatch = stream.Name
+				}
+
+				if filterRegex.MatchString(valueToMatch) {
+					filtered = append(filtered, stream)
+				}
+			}
+		}
+		result = filtered
+	}
+
+	// Apply sorting if specified
+	if options.Sort != "" {
+		sortFunc := func(i, j int) bool {
+			var comparison int
+
+			switch strings.ToLower(options.Sort) {
+			case "stream_id", "id":
+				if result[i].ID < result[j].ID {
+					comparison = -1
+				} else if result[i].ID > result[j].ID {
+					comparison = 1
+				} else {
+					comparison = 0
+				}
+			case "name":
+				comparison = strings.Compare(result[i].Name, result[j].Name)
+			case "stream_type", "type":
+				comparison = strings.Compare(result[i].Type, result[j].Type)
+			case "category_id":
+				comparison = strings.Compare(result[i].CategoryID, result[j].CategoryID)
+			case "container":
+				comparison = strings.Compare(result[i].Container, result[j].Container)
+			// M3U specific sorting
+			case "group-title":
+				comparison = strings.Compare(result[i].GroupTitle, result[j].GroupTitle)
+			case "tvg-id":
+				comparison = strings.Compare(result[i].TVGID, result[j].TVGID)
+			case "tvg-name":
+				comparison = strings.Compare(result[i].TVGName, result[j].TVGName)
+			case "tvg-logo":
+				comparison = strings.Compare(result[i].TVGLogo, result[j].TVGLogo)
+			default:
+				// Default to name if sort key not recognized
+				comparison = strings.Compare(result[i].Name, result[j].Name)
+			}
+
+			// Handle sort direction
+			if options.SortDir == SortDescending {
+				return comparison > 0
+			}
+			return comparison < 0
+		}
+
+		sort.SliceStable(result, sortFunc)
+	}
+
+	return result, nil
 }
 
 func (s *streamService) GetURL(ctx context.Context, streamID int, format string) (string, error) {
@@ -85,34 +210,134 @@ func newCategoryService(c *Client) CategoryService {
 	return &categoryService{client: c}
 }
 
-func (s *categoryService) GetLiveCategories(ctx context.Context) ([]Category, error) {
+func (s *categoryService) GetLiveCategories(ctx context.Context, opts ...RequestOption) ([]Category, error) {
+	options := &RequestOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	params := map[string]string{
 		"action": "get_live_categories",
 	}
 
 	var categories []Category
 	err := s.client.Get(ctx, params, &categories)
-	return categories, err
+	if err != nil {
+		return nil, err
+	}
+
+	return s.filterAndSort(categories, options)
 }
 
-func (s *categoryService) GetVODCategories(ctx context.Context) ([]Category, error) {
+func (s *categoryService) GetVODCategories(ctx context.Context, opts ...RequestOption) ([]Category, error) {
+	options := &RequestOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	params := map[string]string{
 		"action": "get_vod_categories",
 	}
 
 	var categories []Category
 	err := s.client.Get(ctx, params, &categories)
-	return categories, err
+	if err != nil {
+		return nil, err
+	}
+
+	return s.filterAndSort(categories, options)
 }
 
-func (s *categoryService) GetSeriesCategories(ctx context.Context) ([]Category, error) {
+func (s *categoryService) GetSeriesCategories(ctx context.Context, opts ...RequestOption) ([]Category, error) {
+	options := &RequestOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	params := map[string]string{
 		"action": "get_series_categories",
 	}
 
 	var categories []Category
 	err := s.client.Get(ctx, params, &categories)
-	return categories, err
+	if err != nil {
+		return nil, err
+	}
+
+	return s.filterAndSort(categories, options)
+}
+
+func (s *categoryService) filterAndSort(categories []Category, options *RequestOptions) ([]Category, error) {
+	result := categories
+
+	// Apply filtering if specified
+	if options.Filter != "" {
+		filterRegex, err := regexp.Compile(options.Filter)
+		if err != nil {
+			return nil, fmt.Errorf("invalid filter regex: %w", err)
+		}
+
+		filtered := make([]Category, 0)
+		for _, cat := range result {
+			if options.FilterRaw {
+				// Filter against the entire category data
+				categoryStr := fmt.Sprintf("%s|%s|%s|%d",
+					cat.ID, cat.Name, cat.Type, cat.ParentID)
+				if filterRegex.MatchString(categoryStr) {
+					filtered = append(filtered, cat)
+				}
+			} else {
+				// Filter against a specific key
+				var valueToMatch string
+
+				switch strings.ToLower(options.FilterKey) {
+				case "category_id", "id":
+					valueToMatch = cat.ID
+				case "category_name", "name":
+					valueToMatch = cat.Name
+				case "type":
+					valueToMatch = cat.Type
+				default:
+					// Default to name if key not recognized
+					valueToMatch = cat.Name
+				}
+
+				if filterRegex.MatchString(valueToMatch) {
+					filtered = append(filtered, cat)
+				}
+			}
+		}
+		result = filtered
+	}
+
+	// Apply sorting if specified
+	if options.Sort != "" {
+		sortFunc := func(i, j int) bool {
+			var comparison int
+
+			switch strings.ToLower(options.Sort) {
+			case "category_id", "id":
+				comparison = strings.Compare(result[i].ID, result[j].ID)
+			case "category_name", "name":
+				comparison = strings.Compare(result[i].Name, result[j].Name)
+			case "type":
+				comparison = strings.Compare(result[i].Type, result[j].Type)
+			default:
+				// Default to name if sort key not recognized
+				comparison = strings.Compare(result[i].Name, result[j].Name)
+			}
+
+			// Handle sort direction
+			if options.SortDir == SortDescending {
+				return comparison > 0
+			}
+			return comparison < 0
+		}
+
+		sort.SliceStable(result, sortFunc)
+	}
+
+	return result, nil
 }
 
 type epgService struct {
@@ -169,4 +394,42 @@ func (s *epgService) GetXMLTV(ctx context.Context) ([]byte, error) {
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+// WithCategoryID sets the category ID for the request
+func WithCategoryID(categoryID string) RequestOption {
+	return func(opts *RequestOptions) {
+		opts.CategoryID = categoryID
+	}
+}
+
+// WithLimit sets the limit for the request
+func WithLimit(limit int) RequestOption {
+	return func(opts *RequestOptions) {
+		opts.Limit = limit
+	}
+}
+
+// WithFilter sets a filter for the request with the key to filter on and the pattern
+func WithFilter(key, pattern string) RequestOption {
+	return func(opts *RequestOptions) {
+		opts.Filter = pattern
+		opts.FilterKey = key
+	}
+}
+
+// WithFilterRaw sets a raw filter (applied to the entire data) for the request
+func WithFilterRaw(pattern string) RequestOption {
+	return func(opts *RequestOptions) {
+		opts.Filter = pattern
+		opts.FilterRaw = true
+	}
+}
+
+// WithSort sets the sort key and direction for the request
+func WithSort(key string, direction SortDirection) RequestOption {
+	return func(opts *RequestOptions) {
+		opts.Sort = key
+		opts.SortDir = direction
+	}
 }
