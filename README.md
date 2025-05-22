@@ -15,6 +15,10 @@ A modern, production-ready Go library for interacting with IPTV services using t
   - Video on Demand (VOD) content
   - Series and categories
   - Electronic Program Guide (EPG)
+- 🔍 **Filtering & Sorting**:
+  - Filter streams and categories with regex patterns
+  - Sort results by any field
+  - Flexible options for customizing results
 - ⚙️ **Advanced Configuration**:
   - Configurable timeouts and retries
   - Rate limiting with burst support
@@ -103,6 +107,9 @@ go run examples/cmd/main.go vod
 
 # Run EPG example
 go run examples/cmd/main.go epg
+
+# Run filtering and sorting example
+go run examples/filtering_example.go
 ```
 
 ## Available Services
@@ -113,8 +120,13 @@ go run examples/cmd/main.go epg
 // Get live streams
 streams, err := client.StreamService().GetLive(ctx)
 
-// Get VOD content
-vod, err := client.StreamService().GetVOD(ctx, nil)
+// Get VOD content with category ID
+vod, err := client.StreamService().GetVOD(ctx, iptv.WithCategoryID("123"))
+
+// Get VOD content with filtering and sorting
+vod, err := client.StreamService().GetVOD(ctx,
+    iptv.WithFilter("group-title", "Sports|Movies"),
+    iptv.WithSort("name", iptv.SortAscending))
 
 // Get stream URL
 url, err := client.StreamService().GetURL(ctx, streamID, "m3u8")
@@ -126,8 +138,13 @@ url, err := client.StreamService().GetURL(ctx, streamID, "m3u8")
 // Get live categories
 liveCategories, err := client.CategoryService().GetLiveCategories(ctx)
 
-// Get VOD categories
-vodCategories, err := client.CategoryService().GetVODCategories(ctx)
+// Get VOD categories with filtering
+vodCategories, err := client.CategoryService().GetVODCategories(ctx,
+    iptv.WithFilter("name", "Sports|Movies|Premium"))
+
+// Get series categories with sorting
+seriesCategories, err := client.CategoryService().GetSeriesCategories(ctx,
+    iptv.WithSort("name", iptv.SortAscending))
 ```
 
 ### EPG Service
@@ -139,6 +156,58 @@ epg, err := client.EPGService().GetShortEPG(ctx, streamID, 1)
 // Get detailed EPG
 epg, err := client.EPGService().GetShortEPG(ctx, streamID, 3)
 ```
+
+## Filtering and Sorting
+
+The library provides a powerful filtering and sorting API with support for M3U playlist attributes:
+
+```go
+// Basic filtering by field
+categories, err := client.CategoryService().GetVODCategories(ctx,
+    iptv.WithFilter("group-title", "Movies|Series|News"))
+
+// Filter by M3U attributes
+streams, err := client.StreamService().GetVOD(ctx,
+    iptv.WithFilter("tvg-name", ".*S01E\\d+.*")) // Find Season 1 episodes
+
+// Filter by tvg-id
+news, err := client.StreamService().GetLive(ctx,
+    iptv.WithFilter("tvg-id", "news\\..*"))
+
+// Filter by logo path
+hdStreams, err := client.StreamService().GetLive(ctx,
+    iptv.WithFilter("tvg-logo", ".*\\/hd\\/.*"))
+
+// Raw filtering (applies regex to the entire record)
+streams, err := client.StreamService().GetLive(ctx,
+    iptv.WithFilterRaw("Sports|News"))
+
+// Sorting results
+streams, err := client.StreamService().GetVOD(ctx,
+    iptv.WithFilter("group-title", "Movies"),
+    iptv.WithSort("name", iptv.SortAscending))
+
+// Combining multiple options
+streams, err := client.StreamService().GetLive(ctx,
+    iptv.WithCategoryID("123"),
+    iptv.WithFilter("name", "HD"),
+    iptv.WithSort("name", iptv.SortAscending))
+```
+
+### M3U Attribute Filtering
+
+The library handles M3U playlist formats with attributes like:
+
+```
+#EXTINF:-1 tvg-id="channel.1" tvg-name="Series S01E01" tvg-logo="http://example.com/images/logo.jpg" group-title="Series", Show Title
+```
+
+You can filter on any of these attributes:
+
+- `tvg-id`: Channel identifier
+- `tvg-name`: Display name
+- `tvg-logo`: Path to channel logo
+- `group-title`: Channel category/group
 
 ## Configuration Options
 

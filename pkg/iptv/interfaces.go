@@ -13,9 +13,9 @@ type StreamService interface {
 
 // CategoryService handles all category-related operations
 type CategoryService interface {
-	GetLiveCategories(ctx context.Context) ([]Category, error)
-	GetVODCategories(ctx context.Context) ([]Category, error)
-	GetSeriesCategories(ctx context.Context) ([]Category, error)
+	GetLiveCategories(ctx context.Context, opts ...RequestOption) ([]Category, error)
+	GetVODCategories(ctx context.Context, opts ...RequestOption) ([]Category, error)
+	GetSeriesCategories(ctx context.Context, opts ...RequestOption) ([]Category, error)
 }
 
 // EPGService handles all EPG-related operations
@@ -28,8 +28,23 @@ type EPGService interface {
 // RequestOption defines options for API requests
 type RequestOption func(*RequestOptions)
 
+// SortDirection defines the direction of sorting
+type SortDirection string
+
+const (
+	// SortAscending sorts in ascending order
+	SortAscending SortDirection = "asc"
+	// SortDescending sorts in descending order
+	SortDescending SortDirection = "desc"
+)
+
 // RequestOptions contains all possible options for API requests
 type RequestOptions struct {
 	CategoryID string
 	Limit      int
+	Filter     string
+	FilterKey  string
+	FilterRaw  bool
+	Sort       string
+	SortDir    SortDirection
 }
